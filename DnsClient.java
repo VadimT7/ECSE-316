@@ -21,11 +21,12 @@ public class DnsClient {
     private static final int BUFFER_SIZE = 512; // Number of bytes used for the response buffer
 
     public static void main(String[] args) throws IOException {
-        // parse command line arguments
         if (args.length < 2) {
             System.out.println("ERROR   Not enough arguments were supplied.");
             System.exit(1);
         }
+
+        // Parse command line arguments
         fetchArguments(args);
 
         try {
@@ -41,12 +42,17 @@ public class DnsClient {
             int retryCount = 0;
             while (retryCount < MAX_RETRIES) {
                 try {
+                    System.out.println("Dns Client sending request for " + SERVER_NAME);
+                    System.out.println("Server: " + IPAddress);
+                    System.out.println("Request type: " + QUERY_TYPE);
+
+                    // Send the request and then receive it back from the server
                     long sendStartTime = System.currentTimeMillis();
                     socket.send(requestPacket);
                     socket.receive(responsePacket);
                     long sendEndTime = System.currentTimeMillis();
 
-                    System.out.println("Response received after " + (sendEndTime - sendStartTime) / 1000 + " seconds (" + retryCount + "retries)");
+                    System.out.println("Response received after " + (sendEndTime - sendStartTime) / 1000 + " seconds (" + retryCount + " retries)");
 
                     if (checkResponse(request, response)) {
                         printResult(response);
@@ -108,7 +114,8 @@ public class DnsClient {
 
 
     private static byte[] constructRequest(String domainName) {
-        byte[] request = new byte[12 + domainName.length() + 1];
+        String[] domainNameParts = domainName.split("\\."); // remove the dot from the domain
+        byte[] request = new byte[12 + domainNameParts.length + (domainName.length() - (domainNameParts.length - 1)) + 1];
         int requestId = (int) (Math.random() * 65536);
 
         request[0] = (byte) (requestId >> 8);
@@ -125,15 +132,14 @@ public class DnsClient {
         request[11] = (byte) 0;
 
         int index = 12;
-        String[] domainNameParts = domainName.split("\\.");
         for (int i = 0; i < domainNameParts.length; i++) {
             request[index++] = (byte) domainNameParts[i].length();
-            parsedIPAddress[i] = (byte) Integer.parseInt(domainNameParts[i]);
+
             for (int j = 0; j < domainNameParts[i].length(); j++) {
                 request[index++] = (byte) domainNameParts[i].charAt(j);
             }
         }
-        request[index++] = (byte) 0;
+        request[index] = (byte) 0; // set last byte to 0 to indicate end of request
 
         return request;
     }
@@ -188,41 +194,45 @@ public class DnsClient {
     }
 */
 
-    private static void parseResponse(byte[] response) {
-        // parses the DNS response packet
-        // ...
-    }
-
     public static void fetchArguments(String args[]) {
         ListIterator<String> iter = Arrays.asList(args).listIterator();
 
         while (iter.hasNext()) {
             String argument = iter.next();
             switch (argument) {
-                case "-t":
-                    TIMEOUT = Integer.parseInt(iter.next()) * 1000;
-                    break;
-                case "-r":
-                    MAX_RETRIES = Integer.parseInt(iter.next());
-                    break;
-                case "-p":
-                    PORT = Integer.parseInt(iter.next());
-                    break;
                 case "-mx":
                     QUERY_TYPE = "MX";
                     break;
                 case "-ns":
-                    QUERY_TYPE = "ns";
+                    QUERY_TYPE = "NS";
+                    break;
+                case "-t":
+                    String timeoutValue = iter.next();
+                    TIMEOUT = Integer.parseInt(timeoutValue) * 1000;
+                    break;
+                case "-p":
+                    String portNumber = iter.next();
+                    PORT = Integer.parseInt(portNumber);
+                    break;
+                case "-r":
+                    String maxRetries = iter.next();
+                    MAX_RETRIES = Integer.parseInt(maxRetries);
                     break;
             }
 
             if (argument.charAt(0) == '@') {
-                IPAddress = argument.substring(1); // remove the "@"
+                IPAddress = argument.substring(1); // Remove the "@" from the IP Address
 
-                if (iter.next() != null) {
-                    SERVER_NAME = iter.next();
+                // Separate the IPAddress provided as an argument into separate parts for easier future usability
+                String[] ipAddressParts = IPAddress.split("\\.");
+                for (int i = 0; i < ipAddressParts.length; i++){
+                    parsedIPAddress[i] = (byte) Integer.parseInt(ipAddressParts[i]); // set the global variable for future use
+                }
+
+                if (iter.hasNext()) {
+                    SERVER_NAME = iter.next(); // Fetch the domain name
                 } else {
-                    throw new IllegalArgumentException("ERROR   No Domain Name Was Found. Please provide a domain name as an argument following the IP Address.");
+                    throw new IllegalArgumentException("ERROR   No Domain Name Was Found. Please provide a Domain Name argument following the IP Address argument.");
                 }
             }
         }
