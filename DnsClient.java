@@ -79,6 +79,24 @@ public class DnsClient {
     }
 
     private static void printResult(byte[] response) {
+        int pointer = 12;
+        int answerCount = (response[6] & 0xff) << 8 | (response[7] & 0xff);
+
+        for (int i = 0; i < answerCount; i++) {
+            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
+            pointer += length + 5;
+        }
+
+        System.out.println("***Answer Section (" + answerCount + " records)***");
+        for (int i = 0; i < answerCount; i++) {
+            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
+            if ((response[pointer] & 0xff) == 1) {
+                System.out.println("IPv4 address: " + (response[pointer + 3] & 0xff) + "." + (response[pointer + 4] & 0xff) + "." + (response[pointer + 5] & 0xff) + "." + (response[pointer + 6] & 0xff));
+            } else if ((response[pointer] & 0xff) == 28) {
+                System.out.println("IPv6 address: " + String.format("%x", response[pointer + 3] & 0xff) + ":" + String.format("%x", response[pointer + 4] & 0xff) + ":" + String.format("%x", response[pointer + 5] & 0xff) + ":" + String.format("%x", response[pointer + 6] & 0xff) + ":" + String.format("%x", response[pointer + 7] & 0xff) + ":" + String.format("%x", response[pointer + 8] & 0xff) + ":" + String.format("%x", response[pointer + 9] & 0xff) + ":" + String.format("%x", response[pointer + 10] & 0xff));
+            }
+            pointer += length + 5;
+        }
     }
 
     private static boolean checkResponse(byte[] request, byte[] response) {
@@ -144,56 +162,6 @@ public class DnsClient {
         return request;
     }
 
-
-    // Constructs the DNS query packet based on the hostname and query type
-
-    /*private static byte[] constructRequest(String domainName, String queryType) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-
-        //Generate random transaction ID for query
-        Random r = new Random();
-        int transactionID = r.nextInt(65535);
-        dos.writeShort(transactionID);
-
-        //Set flags
-        int flags = 0x0100;
-        dos.writeShort(flags);
-
-        //Number of questions
-        dos.writeShort(0x0001);
-
-        //Number of answers
-        dos.writeShort(0x0000);
-
-        //Number of authority
-        dos.writeShort(0x0000);
-
-        //Number of additional
-        dos.writeShort(0x0000);
-
-        String[] separated_ip_address = IPAddress.split("\\."); //
-
-        for (int i = 0; i < separated_ip_address.length; i++) {
-            parsedIPAddress[i] = (byte) Integer.parseInt(separated_ip_address[i]);
-        }
-
-        //Write the query
-        String[] domainParts = domainName.split("\\.");
-        for(String domainPart : separated_ip_address) {
-            parsedIPAddress[i] = (byte) Integer.parseInt(domainPart);
-            //byte[] domainBytes = domainPart.getBytes("UTF-8");
-            dos.writeByte(parsedIPAddress.length);
-            dos.write(parsedIPAddress);
-        }
-        dos.writeByte(0x00);
-        dos.writeChars(queryType);
-        dos.writeShort(0x0001);
-
-        return baos.toByteArray();
-    }
-*/
-
     public static void fetchArguments(String args[]) {
         ListIterator<String> iter = Arrays.asList(args).listIterator();
 
@@ -225,7 +193,7 @@ public class DnsClient {
 
                 // Separate the IPAddress provided as an argument into separate parts for easier future usability
                 String[] ipAddressParts = IPAddress.split("\\.");
-                for (int i = 0; i < ipAddressParts.length; i++){
+                for (int i = 0; i < ipAddressParts.length; i++) {
                     parsedIPAddress[i] = (byte) Integer.parseInt(ipAddressParts[i]); // set the global variable for future use
                 }
 
