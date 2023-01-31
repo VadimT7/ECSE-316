@@ -1,5 +1,3 @@
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -7,8 +5,6 @@ import java.net.InetAddress;
 import java.net.*;
 import java.util.Arrays;
 import java.util.ListIterator;
-import java.util.NoSuchElementException;
-import java.util.Random;
 
 public class DnsClient {
     private static int MAX_RETRIES = 3;
@@ -78,90 +74,6 @@ public class DnsClient {
         }
     }
 
-    private static void printResult(byte[] response) {
-        int pointer = 12;
-        int answerCount = (response[6] & 0xff) << 8 | (response[7] & 0xff);
-
-        for (int i = 0; i < answerCount; i++) {
-            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
-            pointer += length + 5;
-        }
-
-        System.out.println("***Answer Section (" + answerCount + " records)***");
-        for (int i = 0; i < answerCount; i++) {
-            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
-            if ((response[pointer] & 0xff) == 1) {
-                System.out.println("IPv4 address: " + (response[pointer + 3] & 0xff) + "." + (response[pointer + 4] & 0xff) + "." + (response[pointer + 5] & 0xff) + "." + (response[pointer + 6] & 0xff));
-            } else if ((response[pointer] & 0xff) == 28) {
-                System.out.println("IPv6 address: " + String.format("%x", response[pointer + 3] & 0xff) + ":" + String.format("%x", response[pointer + 4] & 0xff) + ":" + String.format("%x", response[pointer + 5] & 0xff) + ":" + String.format("%x", response[pointer + 6] & 0xff) + ":" + String.format("%x", response[pointer + 7] & 0xff) + ":" + String.format("%x", response[pointer + 8] & 0xff) + ":" + String.format("%x", response[pointer + 9] & 0xff) + ":" + String.format("%x", response[pointer + 10] & 0xff));
-            }
-            pointer += length + 5;
-        }
-    }
-
-    private static boolean checkResponse(byte[] request, byte[] response) {
-        int idx = 12;
-        int qdcount = (response[4] & 0xff) << 8 | (response[5] & 0xff);
-        if (qdcount != 1) {
-            return false;
-        }
-        while (response[idx] != 0) {
-            idx += (response[idx] & 0xff) + 1;
-        }
-        idx += 5;
-        int ancount = (response[6] & 0xff) << 8 | (response[7] & 0xff);
-        int nameLength = (response[idx] & 0xff) << 8 | (response[idx + 1] & 0xff);
-        if (nameLength != (response.length - idx - 10)) {
-            return false;
-        }
-        for (int i = 0; i < nameLength; i++) {
-            if (response[idx + 2 + i] != request[idx + 2 + i]) {
-                return false;
-            }
-        }
-        int type = (response[idx + nameLength + 2] & 0xff) << 8 | (response[idx + nameLength + 3] & 0xff);
-        if (type != 1) {
-            return false;
-        }
-        int rdlength = (response[idx + nameLength + 8] & 0xff) << 8 | (response[idx + nameLength + 9] & 0xff);
-        if (rdlength != 4) {
-            return false;
-        }
-        return true;
-    }
-
-
-    private static byte[] constructRequest(String domainName) {
-        String[] domainNameParts = domainName.split("\\."); // remove the dot from the domain
-        byte[] request = new byte[12 + domainNameParts.length + (domainName.length() - (domainNameParts.length - 1)) + 1];
-        int requestId = (int) (Math.random() * 65536);
-
-        request[0] = (byte) (requestId >> 8);
-        request[1] = (byte) requestId;
-        request[2] = (byte) 1;
-        request[3] = (byte) 0;
-        request[4] = (byte) 0;
-        request[5] = (byte) 1;
-        request[6] = (byte) 0;
-        request[7] = (byte) 0;
-        request[8] = (byte) 0;
-        request[9] = (byte) 0;
-        request[10] = (byte) 0;
-        request[11] = (byte) 0;
-
-        int index = 12;
-        for (int i = 0; i < domainNameParts.length; i++) {
-            request[index++] = (byte) domainNameParts[i].length();
-
-            for (int j = 0; j < domainNameParts[i].length(); j++) {
-                request[index++] = (byte) domainNameParts[i].charAt(j);
-            }
-        }
-        request[index] = (byte) 0; // set last byte to 0 to indicate end of request
-
-        return request;
-    }
-
     public static void fetchArguments(String args[]) {
         ListIterator<String> iter = Arrays.asList(args).listIterator();
 
@@ -204,6 +116,89 @@ public class DnsClient {
                 }
             }
         }
+    }
+
+    private static void printResult(byte[] response) {
+        int pointer = 12;
+        int answerCount = (response[6] & 0xff) << 8 | (response[7] & 0xff);
+
+        for (int i = 0; i < answerCount; i++) {
+            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
+            pointer += length + 5;
+        }
+
+        System.out.println("***Answer Section (" + answerCount + " records)***");
+        for (int i = 0; i < answerCount; i++) {
+            int length = (response[pointer + 1] & 0xff) << 8 | (response[pointer + 2] & 0xff);
+            if ((response[pointer] & 0xff) == 1) {
+                System.out.println("IPv4    " + (response[pointer + 3] & 0xff) + "." + (response[pointer + 4] & 0xff) + "." + (response[pointer + 5] & 0xff) + "." + (response[pointer + 6] & 0xff));
+            } else if ((response[pointer] & 0xff) == 28) {
+                System.out.println("IPv6    " + String.format("%x", response[pointer + 3] & 0xff) + ":" + String.format("%x", response[pointer + 4] & 0xff) + ":" + String.format("%x", response[pointer + 5] & 0xff) + ":" + String.format("%x", response[pointer + 6] & 0xff) + ":" + String.format("%x", response[pointer + 7] & 0xff) + ":" + String.format("%x", response[pointer + 8] & 0xff) + ":" + String.format("%x", response[pointer + 9] & 0xff) + ":" + String.format("%x", response[pointer + 10] & 0xff));
+            }
+            pointer += length + 5;
+        }
+    }
+
+    private static boolean checkResponse(byte[] request, byte[] response) {
+        int idx = 12;
+        int qdcount = (response[4] & 0xff) << 8 | (response[5] & 0xff);
+        if (qdcount != 1) {
+            return false;
+        }
+        while (response[idx] != 0) {
+            idx += (response[idx] & 0xff) + 1;
+        }
+        idx += 5;
+        int ancount = (response[6] & 0xff) << 8 | (response[7] & 0xff);
+        int nameLength = (response[idx] & 0xff) << 8 | (response[idx + 1] & 0xff);
+        if (nameLength != (response.length - idx - 10)) {
+            return false;
+        }
+        for (int i = 0; i < nameLength; i++) {
+            if (response[idx + 2 + i] != request[idx + 2 + i]) {
+                return false;
+            }
+        }
+        int type = (response[idx + nameLength + 2] & 0xff) << 8 | (response[idx + nameLength + 3] & 0xff);
+        if (type != 1) {
+            return false;
+        }
+        int rdlength = (response[idx + nameLength + 8] & 0xff) << 8 | (response[idx + nameLength + 9] & 0xff);
+        if (rdlength != 4) {
+            return false;
+        }
+        return true;
+    }
+
+    private static byte[] constructRequest(String domainName) {
+        String[] domainNameParts = domainName.split("\\."); // remove the dot from the domain
+        byte[] request = new byte[12 + domainNameParts.length + (domainName.length() - (domainNameParts.length - 1)) + 1]; // calculate the necessary number of bytes to allocate to the request
+        int requestId = (int) (Math.random() * 65536);
+
+        request[0] = (byte) (requestId >> 8);
+        request[1] = (byte) requestId;
+        request[2] = (byte) 1;
+        request[3] = (byte) 0;
+        request[4] = (byte) 0;
+        request[5] = (byte) 1;
+        request[6] = (byte) 0;
+        request[7] = (byte) 0;
+        request[8] = (byte) 0;
+        request[9] = (byte) 0;
+        request[10] = (byte) 0;
+        request[11] = (byte) 0;
+
+        // Add the domain name to the array representing the request
+        int index = 12;
+        for (int i = 0; i < domainNameParts.length; i++) {
+            request[index++] = (byte) domainNameParts[i].length(); // store the length of the string
+            for (int j = 0; j < domainNameParts[i].length(); j++) { // store the string itself
+                request[index++] = (byte) domainNameParts[i].charAt(j); // character by character
+            }
+        }
+        request[index] = (byte) 0; // set last byte to 0 to indicate end of request
+
+        return request;
     }
 }
 
